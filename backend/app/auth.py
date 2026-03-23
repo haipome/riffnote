@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import httpx
+import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.database import get_db
+from app.models.notebook import Notebook
+from app.models.user import User
+
+bearer_scheme = HTTPBearer()
+
+_jwks_cache: dict | None = None
+
+
+async def _get_jwks() -> dict:
+    global _jwks_cache
+    if _jwks_cache is None:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                settings.clerk_jwks_url,
+                headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+            )
+            resp.raise_for_status()
+            _jwks_cache = resp.json()
+    return _jwks_cache
+
+
+def _invalidate_jwks_cache() -> None:
+    global _jwks_cache
+    _jwks_cache = None
+
+
+async def _verify_token(token: str) -> dict:
+    """Verify Clerk JWT and return the payload."""
+    jwks = await _get_jwks()
+    public_keys = {}
+    for key_data in jwks.get("keys", []):
+        public_keys[key_data["kid"]] = jwt.algorithms.RSAAlgorithm.from_jwk(key_data)
+
+    headers = jwt.get_unverified_header(token)
+    kid = headers.get("kid")
+    if kid not in public_keys:
+        _invalidate_jwks_cache()
+        jwks = await _get_jwks()
+        public_keys = {}
+        for key_data in jwks.get("keys", []):
+            public_keys[key_data["kid"]] = jwt.algorithms.RSAAlgorithm.from_jwk(
+                key_data
+            )
+        if kid not in public_keys:
+            raise ValueError("Unknown signing key")
+
+    return jwt.decode(token, key=public_keys[kid], algorithms=["RS256"])
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Verify Clerk JWT, then find-or-create the local User row."""
+    try:
+        payload = await _verify_token(credentials.credentials)
+    except (jwt.PyJWTError, ValueError, KeyError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {e}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    clerk_id = payload["sub"]
+
+    user = (await db.execute(select(User).where(User.clerk_id == clerk_id))).scalar_one_or_none()
+
+    if user is None:
+        user = User(clerk_id=clerk_id)
+        db.add(user)
+        await db.flush()
+
+        # Create default notebook for new user
+        default_nb = Notebook(user_id=user.id, name="默认笔记本", is_default=True)
+        db.add(default_nb)
+        await db.commit()
+        await db.refresh(user)
+
+    return user
