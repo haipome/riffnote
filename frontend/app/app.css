@@ -24,8 +24,8 @@ body {
 
 /* Sidebar */
 .sidebar {
-  width: 260px;
-  min-width: 260px;
+  width: 300px;
+  min-width: 300px;
   transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
   @apply h-full flex flex-col border-r border-[var(--color-border)] dark:border-[var(--color-border-dark)] bg-[var(--color-sidebar)] dark:bg-[var(--color-sidebar-dark)];
 }
@@ -35,6 +35,20 @@ body {
   min-width: 0;
   overflow: hidden;
   opacity: 0;
+}
+
+/* Mobile sidebar: full-screen overlay */
+.sidebar.mobile {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100% !important;
+  min-width: 100% !important;
+}
+
+.sidebar.mobile.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
 }
 
 /* Toggle button */

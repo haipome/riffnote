@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -19,6 +21,17 @@ async def list_notebooks(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Auto-create default notebook if user has none
+    has_any = (
+        await db.execute(
+            select(Notebook.id).where(Notebook.user_id == user.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if has_any is None:
+        default_nb = Notebook(user_id=user.id, name="默认笔记本", is_default=True)
+        db.add(default_nb)
+        await db.commit()
+
     stmt = (
         select(
             Notebook,
@@ -106,12 +119,35 @@ async def update_notebook(
 @router.delete("/{notebook_id}", status_code=204)
 async def delete_notebook(
     notebook_id: int,
+    action: Optional[str] = Query(None),
+    move_to: Optional[int] = Query(None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     nb = await _get_user_notebook(db, notebook_id, user.id)
-    if nb.is_default:
-        raise HTTPException(400, "Cannot delete the default notebook")
+    note_count = await _note_count(db, notebook_id)
+
+    if note_count > 0:
+        if action == "move_notes":
+            if not move_to:
+                raise HTTPException(400, "move_to is required when action is move_notes")
+            target = await _get_user_notebook(db, move_to, user.id)
+            await db.execute(
+                update(Note)
+                .where(Note.notebook_id == notebook_id)
+                .values(notebook_id=target.id)
+            )
+            await db.flush()
+            # Expire notebook's cached notes to avoid cascade deleting moved notes
+            await db.refresh(nb)
+        elif action == "delete_notes":
+            pass  # cascade will handle it, or delete explicitly below
+        else:
+            raise HTTPException(
+                400,
+                "Notebook has notes. Specify action=delete_notes or action=move_notes&move_to=<id>",
+            )
+
     await db.delete(nb)
     await db.commit()
 

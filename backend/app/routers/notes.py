@@ -10,7 +10,7 @@ from app.models.notebook import Notebook
 from app.models.note import Note
 from app.models.user import User
 from app.schemas.note import NoteListItem, NoteResponse, NoteStatusResponse, NoteUpdate
-from app.services.storage_service import delete_audio, save_audio
+from app.services.storage_service import delete_audio, save_audio_temp
 
 router = APIRouter(tags=["notes"])
 
@@ -39,10 +39,13 @@ async def create_note(
     db.add(note)
     await db.flush()
 
-    # Save audio file
+    # Save audio to temp file
     audio_data = await audio.read()
-    ext = audio.filename.rsplit(".", 1)[-1] if audio.filename and "." in audio.filename else "webm"
-    file_path = save_audio(user.id, note.id, audio_data, ext)
+    ALLOWED_EXTENSIONS = {"ogg", "mp4", "mp3", "wav", "flac", "aac", "webm", "mpeg"}
+    ext = audio.filename.rsplit(".", 1)[-1].lower() if audio.filename and "." in audio.filename else "webm"
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"Unsupported audio format: {ext}")
+    file_path = save_audio_temp(audio_data, ext)
     note.audio_file_path = file_path
 
     await db.commit()
@@ -145,6 +148,7 @@ async def delete_note(
     db: AsyncSession = Depends(get_db),
 ):
     note = await _get_user_note(db, note_id, user.id)
+    # Clean up temp audio if still present (e.g. note deleted while processing)
     if note.audio_file_path:
         delete_audio(note.audio_file_path)
     await db.delete(note)

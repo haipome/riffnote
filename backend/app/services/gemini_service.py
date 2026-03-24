@@ -5,8 +5,11 @@ import mimetypes
 import os
 import subprocess
 import tempfile
+import time
+from typing import Optional
 
 from google import genai
+from google.genai import types
 
 from app.config import settings
 
@@ -30,12 +33,27 @@ SYSTEM_PROMPT = """角色： 你是一位文字修辞专家，擅长在不改变
 
 6. 分段排版：根据内容逻辑自然分段，增加易读性。
 
-输出规则：
+输出格式：
 
-• 直接输出精修后的全文，不要任何开场白或结尾客套话。"""
+• 使用 Markdown 格式输出。
+• 第一行必须是一个一级标题（# 标题），用一句简短的话概括录音的核心主题，作为标题摘要。
+• 标题之后是精修后的正文，不要任何开场白或结尾客套话。"""
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-2.5-flash-lite"
 GEMINI_SUPPORTED_MIMES = {"audio/ogg", "audio/mp4", "audio/mpeg", "audio/mp3", "audio/wav", "audio/flac", "audio/aac"}
+
+# Reuse client across calls to avoid repeated initialization
+_client: Optional[genai.Client] = None
+
+# Files larger than 20MB must use the Files API; smaller ones use inline data
+_INLINE_MAX_BYTES = 20 * 1024 * 1024
+
+
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=settings.gemini_api_key)
+    return _client
 
 
 def _convert_to_mp3(input_path: str) -> str:
@@ -52,7 +70,9 @@ def _convert_to_mp3(input_path: str) -> str:
 
 
 def transcribe_audio(audio_file_path: str) -> str:
-    """Upload audio to Gemini via SDK, then generate structured text."""
+    """Send audio to Gemini and generate structured text."""
+    t0 = time.monotonic()
+
     mime_type, _ = mimetypes.guess_type(audio_file_path)
     if mime_type is None:
         mime_type = "audio/webm"
@@ -61,26 +81,37 @@ def transcribe_audio(audio_file_path: str) -> str:
     converted_path = None
     if mime_type not in GEMINI_SUPPORTED_MIMES:
         converted_path = _convert_to_mp3(audio_file_path)
-        upload_path = converted_path
-        upload_mime = "audio/mpeg"
+        audio_path = converted_path
+        audio_mime = "audio/mpeg"
     else:
-        upload_path = audio_file_path
-        upload_mime = mime_type
+        audio_path = audio_file_path
+        audio_mime = mime_type
 
     try:
-        client = genai.Client(api_key=settings.gemini_api_key)
+        client = _get_client()
+        file_size = os.path.getsize(audio_path)
 
-        uploaded_file = client.files.upload(
-            file=upload_path,
-            config={"mime_type": upload_mime},
-        )
-        logger.info("Uploaded file: name=%s state=%s", uploaded_file.name, uploaded_file.state)
+        if file_size <= _INLINE_MAX_BYTES:
+            # Inline data — single API call, much faster
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
+            audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=audio_mime)
+            logger.info("Using inline data: %d bytes, mime=%s", file_size, audio_mime)
+        else:
+            # Large file — must use Files API (upload + reference)
+            audio_part = client.files.upload(
+                file=audio_path,
+                config={"mime_type": audio_mime},
+            )
+            logger.info("Uploaded via Files API: name=%s size=%d", audio_part.name, file_size)
 
         response = client.models.generate_content(
             model=MODEL,
-            contents=[uploaded_file, SYSTEM_PROMPT],
+            contents=[audio_part, SYSTEM_PROMPT],
         )
 
+        elapsed = time.monotonic() - t0
+        logger.info("Gemini completed in %.1fs for %s", elapsed, audio_file_path)
         return response.text
     finally:
         if converted_path:

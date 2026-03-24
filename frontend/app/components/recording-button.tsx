@@ -53,6 +53,11 @@ export default function RecordingButton({ onRecordingComplete }: RecordingButton
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      // Stop MediaRecorder and release microphone on unmount
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
     };
   }, []);
 

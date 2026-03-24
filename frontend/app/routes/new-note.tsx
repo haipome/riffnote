@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import RecordingButton from "~/components/recording-button";
 import { apiFetch } from "~/lib/api";
 
-type Phase = "idle" | "recording" | "uploading" | "processing" | "done" | "error";
+type Phase = "idle" | "uploading" | "error";
 
 export default function NewNotePage() {
   const { id: notebookId } = useParams();
@@ -25,39 +25,14 @@ export default function NewNotePage() {
       formData.append("notebook_id", notebookId!);
       formData.append("audio", blob, `recording.${ext}`);
 
-      const note = await apiFetch<{ id: number; status: string }>(
+      const note = await apiFetch<{ id: number }>(
         "/api/notes",
         token,
         { method: "POST", body: formData }
       );
 
-      setPhase("processing");
-
-      // Poll status with fresh token each time
-      const noteId = note.id;
-      const poll = async () => {
-        try {
-          const freshToken = await getToken();
-          if (!freshToken) throw new Error("Not authenticated");
-          const status = await apiFetch<{ status: string; error_message?: string }>(
-            `/api/notes/${noteId}/status`,
-            freshToken
-          );
-          if (status.status === "completed") {
-            setPhase("done");
-            navigate(`/notes/${noteId}`, { replace: true });
-          } else if (status.status === "failed") {
-            setPhase("error");
-            setError(status.error_message || "Processing failed");
-          } else {
-            setTimeout(poll, 500);
-          }
-        } catch (e: any) {
-          setPhase("error");
-          setError(e.message || "Polling failed");
-        }
-      };
-      poll();
+      // Navigate immediately — note-detail.tsx handles polling
+      navigate(`/notes/${note.id}`, { replace: true });
     } catch (e: any) {
       setPhase("error");
       setError(e.message || "Upload failed");
@@ -73,22 +48,9 @@ export default function NewNotePage() {
         </>
       )}
 
-      {phase === "recording" && (
-        <RecordingButton onRecordingComplete={handleRecordingComplete} />
-      )}
-
       {phase === "uploading" && (
         <div style={{ textAlign: "center" }}>
           <div className="text-gray-400" style={{ fontSize: "1.1rem" }}>Uploading...</div>
-        </div>
-      )}
-
-      {phase === "processing" && (
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "1.1rem", marginBottom: 8 }}>Processing with AI...</div>
-          <p className="text-gray-400" style={{ fontSize: "0.85rem" }}>
-            Transcribing and restructuring your recording
-          </p>
         </div>
       )}
 

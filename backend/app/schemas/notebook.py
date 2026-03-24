@@ -3,15 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class NotebookCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=255)
 
 
 class NotebookUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
 
 
 class NotebookResponse(BaseModel):
