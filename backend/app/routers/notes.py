@@ -50,12 +50,14 @@ async def create_note(
     file_path = save_audio_temp(audio_data, ext)
     note.audio_file_path = file_path
 
+    # Save the original MIME type from the upload for Gemini
+    audio_mime = audio.content_type or "application/octet-stream"
+
     await db.commit()
     await db.refresh(note)
 
-    # Trigger background processing (Phase 4 will add Gemini integration)
     from app.services.processing_service import process_note
-    background_tasks.add_task(process_note, note.id)
+    background_tasks.add_task(process_note, note.id, audio_mime)
 
     return note
 

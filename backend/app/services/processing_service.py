@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import create_engine
@@ -34,7 +35,7 @@ def _is_retryable(e: Exception) -> bool:
     return False
 
 
-def process_note(note_id: UUID) -> None:
+def process_note(note_id: UUID, audio_mime: Optional[str] = None) -> None:
     """Process a note in a background thread: Gemini transcription + TipTap conversion."""
     with Session(_sync_engine) as db:
         note = db.get(Note, note_id)
@@ -53,7 +54,7 @@ def process_note(note_id: UUID) -> None:
             last_error = None
             for attempt in range(MAX_RETRIES):
                 try:
-                    markdown = transcribe_audio(audio_path)
+                    markdown = transcribe_audio(audio_path, mime_type=audio_mime)
                     break
                 except Exception as e:
                     last_error = e

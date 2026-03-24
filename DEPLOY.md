@@ -34,7 +34,7 @@ Cloudflare 代理会自动处理 SSL，请求以 HTTP 转发到 EC2。
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3.12 python3.12-venv python3-pip \
-  postgresql postgresql-contrib nginx ffmpeg git
+  postgresql postgresql-contrib nginx git
 ```
 
 ### 配置 PostgreSQL
@@ -86,7 +86,7 @@ alembic upgrade head
 ### 配置 Systemd 服务
 
 ```bash
-sudo cat > /etc/systemd/system/riffnote.service << 'EOF'
+sudo tee /etc/systemd/system/riffnote.service << 'EOF'
 [Unit]
 Description=RiffNote API
 After=network.target postgresql.service
@@ -113,7 +113,7 @@ sudo systemctl start riffnote
 ### 配置 Nginx
 
 ```bash
-sudo cat > /etc/nginx/sites-available/riffnote-api << 'EOF'
+sudo tee /etc/nginx/sites-available/riffnote-api << 'EOF'
 server {
     listen 80;
     server_name api.riffnote.app;
@@ -188,13 +188,23 @@ sudo systemctl restart riffnote
 
 Push 到 GitHub，Cloudflare Pages 自动部署。
 
-## 5. 日志查看
+## 5. 常用运维命令
 
 ```bash
-# 后端日志
-sudo journalctl -u riffnote -f
+# 服务管理
+sudo systemctl restart riffnote       # 重启后端
+sudo systemctl stop riffnote          # 停止后端
+sudo systemctl status riffnote        # 查看服务状态
 
-# Nginx 日志
+# 日志
+sudo journalctl -u riffnote -f        # 实时查看后端日志
+sudo journalctl -u riffnote --since "1h ago"  # 最近 1 小时日志
+
+# Nginx
+sudo nginx -t && sudo systemctl reload nginx  # 测试并重载配置
 sudo tail -f /var/log/nginx/access.log
 sudo tail -f /var/log/nginx/error.log
+
+# 数据库
+sudo -u postgres psql -d riffnote     # 进入数据库
 ```

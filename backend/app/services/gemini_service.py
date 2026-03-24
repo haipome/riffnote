@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import mimetypes
 import os
 import time
 from typing import Optional
@@ -40,6 +39,16 @@ SYSTEM_PROMPT = """角色： 你是一位文字修辞专家，擅长在不改变
 MODEL = "gemini-2.5-flash"
 GEMINI_SUPPORTED_MIMES = {"audio/ogg", "audio/mp4", "audio/mpeg", "audio/mp3", "audio/wav", "audio/flac", "audio/aac"}
 
+# Extension-to-MIME mapping for retry (when original content_type is unavailable)
+_EXT_MIME_MAP = {
+    ".ogg": "audio/ogg",
+    ".mp4": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
+    ".aac": "audio/aac",
+}
+
 # Reuse client across calls to avoid repeated initialization
 _client: Optional[genai.Client] = None
 
@@ -54,13 +63,18 @@ def _get_client() -> genai.Client:
     return _client
 
 
-def transcribe_audio(audio_file_path: str) -> str:
+def transcribe_audio(audio_file_path: str, mime_type: Optional[str] = None) -> str:
     """Send audio to Gemini and generate structured text."""
     t0 = time.monotonic()
 
-    mime_type, _ = mimetypes.guess_type(audio_file_path)
     if mime_type is None:
-        mime_type = "application/octet-stream"
+        # Fallback: guess from file extension (for retry scenarios)
+        ext = os.path.splitext(audio_file_path)[1].lower()
+        mime_type = _EXT_MIME_MAP.get(ext, "application/octet-stream")
+
+    # Normalize: video/mp4 from Safari is actually audio
+    if mime_type == "video/mp4":
+        mime_type = "audio/mp4"
 
     if mime_type not in GEMINI_SUPPORTED_MIMES:
         raise ValueError(f"Unsupported audio format: {mime_type}. Supported: {', '.join(sorted(GEMINI_SUPPORTED_MIMES))}")
