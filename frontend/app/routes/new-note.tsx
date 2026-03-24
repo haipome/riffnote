@@ -25,7 +25,7 @@ export default function NewNotePage() {
       formData.append("notebook_id", notebookId!);
       formData.append("audio", blob, `recording.${ext}`);
 
-      const note = await apiFetch<{ id: number }>(
+      const note = await apiFetch<{ id: string }>(
         "/api/notes",
         token,
         { method: "POST", body: formData }

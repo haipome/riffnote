@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, String, Text, Uuid, func
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,12 +18,11 @@ if TYPE_CHECKING:
 class Note(Base):
     __tablename__ = "notes"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    notebook_id: Mapped[int] = mapped_column(ForeignKey("notebooks.id"), index=True)
+    notebook_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notebooks.id"), index=True)
     title: Mapped[str] = mapped_column(String(500), default="无标题笔记")
-    content_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    content_markdown: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    content: Mapped[Optional[Any]] = mapped_column("content", JSON, nullable=True)
     audio_file_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     audio_duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="processing")

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,7 @@ router = APIRouter(tags=["notes"])
 @router.post("/api/notes", response_model=NoteResponse, status_code=201)
 async def create_note(
     background_tasks: BackgroundTasks,
-    notebook_id: int = Form(...),
+    notebook_id: UUID = Form(...),
     audio: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -60,7 +62,7 @@ async def create_note(
 
 @router.get("/api/notebooks/{notebook_id}/notes")
 async def list_notes(
-    notebook_id: int,
+    notebook_id: UUID,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     user: User = Depends(get_current_user),
@@ -102,7 +104,7 @@ async def list_notes(
 
 @router.get("/api/notes/{note_id}", response_model=NoteResponse)
 async def get_note(
-    note_id: int,
+    note_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -112,7 +114,7 @@ async def get_note(
 
 @router.patch("/api/notes/{note_id}", response_model=NoteResponse)
 async def update_note(
-    note_id: int,
+    note_id: UUID,
     body: NoteUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -133,8 +135,8 @@ async def update_note(
 
     if body.title is not None:
         note.title = body.title
-    if body.content_json is not None:
-        note.content_json = body.content_json
+    if body.content is not None:
+        note.content = body.content
 
     await db.commit()
     await db.refresh(note)
@@ -143,7 +145,7 @@ async def update_note(
 
 @router.delete("/api/notes/{note_id}", status_code=204)
 async def delete_note(
-    note_id: int,
+    note_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -155,9 +157,30 @@ async def delete_note(
     await db.commit()
 
 
+@router.post("/api/notes/{note_id}/retry", response_model=NoteStatusResponse)
+async def retry_note(
+    note_id: UUID,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    note = await _get_user_note(db, note_id, user.id)
+    if note.status != "failed":
+        raise HTTPException(400, "Only failed notes can be retried")
+    if not note.audio_file_path:
+        raise HTTPException(400, "Audio file no longer available, please re-record")
+    note.status = "processing"
+    note.error_message = None
+    await db.commit()
+    await db.refresh(note)
+    from app.services.processing_service import process_note
+    background_tasks.add_task(process_note, note.id)
+    return NoteStatusResponse(id=note.id, status=note.status, error_message=None)
+
+
 @router.get("/api/notes/{note_id}/status", response_model=NoteStatusResponse)
 async def get_note_status(
-    note_id: int,
+    note_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -165,7 +188,7 @@ async def get_note_status(
     return NoteStatusResponse(id=note.id, status=note.status, error_message=note.error_message)
 
 
-async def _get_user_note(db: AsyncSession, note_id: int, user_id: int) -> Note:
+async def _get_user_note(db: AsyncSession, note_id: UUID, user_id: int) -> Note:
     note = (
         await db.execute(
             select(Note).where(Note.id == note_id, Note.user_id == user_id)

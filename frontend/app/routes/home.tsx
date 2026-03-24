@@ -7,7 +7,7 @@ import { useIsMobile } from "~/lib/use-is-mobile";
 import type { Route } from "./+types/home";
 
 interface Notebook {
-  id: number;
+  id: string;
   name: string;
   is_default: boolean;
 }
@@ -25,7 +25,7 @@ export default function Home() {
   const isMobile = useIsMobile();
 
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
-  const [selectedNbId, setSelectedNbId] = useState<number | null>(null);
+  const [selectedNbId, setSelectedNbId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [authTab, setAuthTab] = useState<"signin" | "signup">("signin");
 
@@ -55,7 +55,7 @@ export default function Home() {
       formData.append("notebook_id", String(selectedNbId));
       formData.append("audio", blob, `recording.${ext}`);
 
-      const note = await apiFetch<{ id: number }>(
+      const note = await apiFetch<{ id: string }>(
         "/api/notes",
         token,
         { method: "POST", body: formData }
@@ -166,7 +166,7 @@ export default function Home() {
                 <span>录入到</span>
                 <select
                   value={selectedNbId}
-                  onChange={(e) => setSelectedNbId(Number(e.target.value))}
+                  onChange={(e) => setSelectedNbId(e.target.value)}
                   style={{
                     padding: "4px 8px",
                     borderRadius: 6,

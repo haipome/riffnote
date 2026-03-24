@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -15,7 +16,7 @@ class NotebookUpdate(BaseModel):
 
 
 class NotebookResponse(BaseModel):
-    id: int
+    id: UUID
     name: str
     is_default: bool
     note_count: int = 0

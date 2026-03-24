@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     clerk_publishable_key: str = ""
     gemini_api_key: str = ""
     upload_dir: str = "uploads"
+    cors_origins: str = "http://localhost:5173"  # comma-separated for multiple origins
 
     model_config = {"env_file": ".env"}
 

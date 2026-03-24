@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, update
@@ -86,7 +87,7 @@ async def create_notebook(
 
 @router.patch("/{notebook_id}", response_model=NotebookResponse)
 async def update_notebook(
-    notebook_id: int,
+    notebook_id: UUID,
     body: NotebookUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -118,9 +119,9 @@ async def update_notebook(
 
 @router.delete("/{notebook_id}", status_code=204)
 async def delete_notebook(
-    notebook_id: int,
+    notebook_id: UUID,
     action: Optional[str] = Query(None),
-    move_to: Optional[int] = Query(None),
+    move_to: Optional[UUID] = Query(None),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -153,7 +154,7 @@ async def delete_notebook(
 
 
 async def _get_user_notebook(
-    db: AsyncSession, notebook_id: int, user_id: int
+    db: AsyncSession, notebook_id: UUID, user_id: int
 ) -> Notebook:
     nb = (
         await db.execute(
@@ -167,7 +168,7 @@ async def _get_user_notebook(
     return nb
 
 
-async def _note_count(db: AsyncSession, notebook_id: int) -> int:
+async def _note_count(db: AsyncSession, notebook_id: UUID) -> int:
     result = await db.execute(
         select(func.count(Note.id)).where(Note.notebook_id == notebook_id)
     )

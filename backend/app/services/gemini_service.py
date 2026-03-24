@@ -39,7 +39,7 @@ SYSTEM_PROMPT = """角色： 你是一位文字修辞专家，擅长在不改变
 • 第一行必须是一个一级标题（# 标题），用一句简短的话概括录音的核心主题，作为标题摘要。
 • 标题之后是精修后的正文，不要任何开场白或结尾客套话。"""
 
-MODEL = "gemini-2.5-flash-lite"
+MODEL = "gemini-2.5-flash"
 GEMINI_SUPPORTED_MIMES = {"audio/ogg", "audio/mp4", "audio/mpeg", "audio/mp3", "audio/wav", "audio/flac", "audio/aac"}
 
 # Reuse client across calls to avoid repeated initialization

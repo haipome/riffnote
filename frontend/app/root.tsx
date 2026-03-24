@@ -25,14 +25,14 @@ import { apiFetch } from "~/lib/api";
 import { useIsMobile } from "~/lib/use-is-mobile";
 
 interface Notebook {
-  id: number;
+  id: string;
   name: string;
   is_default: boolean;
   note_count: number;
 }
 
 interface NoteItem {
-  id: number;
+  id: string;
   title: string;
   status: string;
 }
@@ -71,10 +71,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean; onToggle: () => void; isMobile: boolean }) {
   const { getToken, isSignedIn } = useAuth();
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
-  const [expandedNbId, setExpandedNbId] = useState<number | null>(null);
+  const [expandedNbId, setExpandedNbId] = useState<string | null>(null);
   const [nbNotes, setNbNotes] = useState<NoteItem[]>([]);
-  const [menuNoteId, setMenuNoteId] = useState<number | null>(null);
-  const [menuNbId, setMenuNbId] = useState<number | null>(null);
+  const [menuNoteId, setMenuNoteId] = useState<string | null>(null);
+  const [menuNbId, setMenuNbId] = useState<string | null>(null);
   const [renameNb, setRenameNb] = useState<Notebook | null>(null);
   const [renameNbName, setRenameNbName] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -95,9 +95,9 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
 
   // Auto-expand notebook from URL (/notebooks/:id or /notebooks/:id/new)
   useEffect(() => {
-    const nbMatch = location.pathname.match(/^\/notebooks\/(\d+)/);
+    const nbMatch = location.pathname.match(/^\/notebooks\/([^/]+)/);
     if (nbMatch) {
-      setExpandedNbId(Number(nbMatch[1]));
+      setExpandedNbId(nbMatch[1]);
     }
   }, [location.pathname]);
 
@@ -124,13 +124,13 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
   }, [expandedNbId, isSignedIn, location.pathname, noteRefreshKey]);
 
   // Extract active note id from URL
-  const noteMatch = location.pathname.match(/^\/notes\/(\d+)/);
-  const activeNoteId = noteMatch ? Number(noteMatch[1]) : null;
+  const noteMatch = location.pathname.match(/^\/notes\/([^/]+)/);
+  const activeNoteId = noteMatch ? noteMatch[1] : null;
 
   const [showNewNbDialog, setShowNewNbDialog] = useState(false);
   const [newNbName, setNewNbName] = useState("");
 
-  function toggleNotebook(nbId: number) {
+  function toggleNotebook(nbId: string) {
     setExpandedNbId(expandedNbId === nbId ? null : nbId);
   }
 
@@ -152,7 +152,7 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
   // Delete notebook dialog state
   const [deleteNb, setDeleteNb] = useState<Notebook | null>(null);
   const [deleteAction, setDeleteAction] = useState<"delete" | "move">("delete");
-  const [deleteMoveTarget, setDeleteMoveTarget] = useState<number | null>(null);
+  const [deleteMoveTarget, setDeleteMoveTarget] = useState<string | null>(null);
 
   function openDeleteNbDialog(nb: Notebook) {
     setDeleteNb(nb);
@@ -222,9 +222,9 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuNoteId, menuNbId]);
 
-  const [moveNoteId, setMoveNoteId] = useState<number | null>(null);
+  const [moveNoteId, setMoveNoteId] = useState<string | null>(null);
 
-  async function handleMoveNote(noteId: number, targetNbId: number) {
+  async function handleMoveNote(noteId: string, targetNbId: string) {
     const token = await getToken();
     if (!token) return;
     await apiFetch(`/api/notes/${noteId}`, token, {
@@ -240,7 +240,7 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
     setNotebooks(data);
   }
 
-  async function handleDeleteNote(noteId: number) {
+  async function handleDeleteNote(noteId: string) {
     if (!confirm("Delete this note?")) {
       setMenuNoteId(null);
       return;
@@ -840,7 +840,7 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
                     <span>Move notes to</span>
                     <select
                       value={deleteMoveTarget ?? ""}
-                      onChange={(e) => { setDeleteMoveTarget(Number(e.target.value)); setDeleteAction("move"); }}
+                      onChange={(e) => { setDeleteMoveTarget(e.target.value); setDeleteAction("move"); }}
                       style={{
                         padding: "4px 8px",
                         borderRadius: 6,

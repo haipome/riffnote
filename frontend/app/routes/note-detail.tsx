@@ -8,10 +8,10 @@ import { useIsMobile } from "~/lib/use-is-mobile";
 import { apiFetch } from "~/lib/api";
 
 interface NoteData {
-  id: number;
-  notebook_id: number;
+  id: string;
+  notebook_id: string;
   title: string;
-  content_json: any;
+  content: any;
   status: string;
   error_message?: string;
   created_at: string;
@@ -35,6 +35,7 @@ export default function NoteDetailPage() {
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pendingContent, setPendingContent] = useState<any>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -46,7 +47,7 @@ export default function NoteDetailPage() {
     onUpdate: ({ editor }) => {
       // Only auto-save when in edit mode
       if (editor.isEditable) {
-        debouncedSave({ content_json: editor.getJSON() });
+        debouncedSave({ content: editor.getJSON() });
       }
     },
   });
@@ -89,8 +90,8 @@ export default function NoteDetailPage() {
       setTitle(data.title);
       setLoading(false);
 
-      if (data.status === "completed" && data.content_json) {
-        setPendingContent(data.content_json);
+      if (data.status === "completed" && data.content) {
+        setPendingContent(data.content);
         // Auto-enter edit mode if ?edit=1
         if (searchParams.get("edit") === "1") {
           setEditing(true);
@@ -125,8 +126,8 @@ export default function NoteDetailPage() {
           setNote(data);
           setTitle(data.title);
           setLoading(false);
-          if (data.content_json) {
-            setPendingContent(data.content_json);
+          if (data.content) {
+            setPendingContent(data.content);
           }
           // Notify sidebar to refresh note list
           window.dispatchEvent(new Event("note-updated"));
@@ -148,7 +149,7 @@ export default function NoteDetailPage() {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
     };
-  }, [id, getToken]);
+  }, [id, getToken, retryKey]);
 
   const save = useCallback(async (updates: Record<string, any>) => {
     const token = await getToken();
@@ -184,7 +185,7 @@ export default function NoteDetailPage() {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
       if (editor) {
-        save({ content_json: editor.getJSON() });
+        save({ content: editor.getJSON() });
       }
     }
     // Save title if changed
@@ -221,11 +222,32 @@ export default function NoteDetailPage() {
     );
   }
 
+  async function handleRetry() {
+    const token = await getToken();
+    if (!token || !id) return;
+    await apiFetch(`/api/notes/${id}/retry`, token, { method: "POST" });
+    setRetryKey((k) => k + 1);
+  }
+
   if (note.status === "failed") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}>
         <p style={{ color: "#ef4444" }}>Processing failed</p>
         <p className="text-gray-400" style={{ fontSize: "0.85rem" }}>{note.error_message}</p>
+        <button
+          onClick={handleRetry}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 6,
+            border: "1px solid #d1d5db",
+            background: "transparent",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            color: "inherit",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }

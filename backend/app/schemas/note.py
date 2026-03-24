@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class NoteListItem(BaseModel):
-    id: int
-    notebook_id: int
+    id: UUID
+    notebook_id: UUID
     title: str
     status: str
     created_at: datetime
@@ -18,10 +19,10 @@ class NoteListItem(BaseModel):
 
 
 class NoteResponse(BaseModel):
-    id: int
-    notebook_id: int
+    id: UUID
+    notebook_id: UUID
     title: str
-    content_json: Optional[Any] = None
+    content: Optional[Any] = None
     status: str
     audio_duration_seconds: Optional[float] = None
     error_message: Optional[str] = None
@@ -33,11 +34,11 @@ class NoteResponse(BaseModel):
 
 class NoteUpdate(BaseModel):
     title: Optional[str] = None
-    content_json: Optional[Any] = None
-    notebook_id: Optional[int] = None
+    content: Optional[Any] = None
+    notebook_id: Optional[UUID] = None
 
 
 class NoteStatusResponse(BaseModel):
-    id: int
+    id: UUID
     status: str
     error_message: Optional[str] = None
