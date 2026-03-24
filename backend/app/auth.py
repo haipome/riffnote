@@ -30,7 +30,10 @@ async def _get_jwks(force_refresh: bool = False) -> dict:
     now = time.monotonic()
     if _jwks_cache is None or force_refresh or (now - _jwks_cache_time > _JWKS_TTL_SECONDS):
         async with httpx.AsyncClient() as client:
-            resp = await client.get(settings.clerk_jwks_url)
+            resp = await client.get(
+                settings.clerk_jwks_url,
+                headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+            )
             resp.raise_for_status()
             _jwks_cache = resp.json()
             _jwks_cache_time = now
