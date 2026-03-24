@@ -4,4 +4,5 @@ export default [
   index("routes/home.tsx"),
   route("notebooks/:id/new", "routes/new-note.tsx"),
   route("notes/:id", "routes/note-detail.tsx"),
+  route("privacy", "routes/privacy.tsx"),
 ] satisfies RouteConfig;

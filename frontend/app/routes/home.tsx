@@ -148,6 +148,10 @@ export default function Home() {
             ) : (
               <SignUp routing="hash" />
             )}
+            <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 16, textAlign: "center" }}>
+              By continuing, you agree to our{" "}
+              <a href="/privacy" style={{ color: "#6b7280", textDecoration: "underline" }}>Privacy Policy</a>
+            </p>
           </div>
         </div>
       </Show>
