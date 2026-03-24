@@ -118,10 +118,12 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
   useEffect(() => {
     if (!isSignedIn) return;
     (async () => {
-      const token = await getToken();
-      if (!token) return;
-      const data = await apiFetch<Notebook[]>("/api/notebooks", token);
-      setNotebooks(data);
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const data = await apiFetch<Notebook[]>("/api/notebooks", token);
+        setNotebooks(data);
+      } catch { /* sidebar fetch failure is non-fatal */ }
     })();
   }, [isSignedIn, location.pathname]);
 
@@ -148,10 +150,12 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
       return;
     }
     (async () => {
-      const token = await getToken();
-      if (!token) return;
-      const data = await apiFetch<{ items: NoteItem[] }>(`/api/notebooks/${expandedNbId}/notes`, token);
-      setNbNotes(data.items);
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const data = await apiFetch<{ items: NoteItem[] }>(`/api/notebooks/${expandedNbId}/notes`, token);
+        setNbNotes(data.items);
+      } catch { /* notes fetch failure is non-fatal */ }
     })();
   }, [expandedNbId, isSignedIn, location.pathname, noteRefreshKey]);
 
@@ -217,8 +221,10 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
     const data = await apiFetch<Notebook[]>("/api/notebooks", token);
     setNotebooks(data);
 
-    // Navigate away if on a note/page within the deleted notebook
-    if (location.pathname.startsWith(`/notebooks/${nb.id}`)) {
+    // Navigate away if on a page within the deleted notebook, or viewing a note that was cascade-deleted
+    const onDeletedNbPage = location.pathname.startsWith(`/notebooks/${nb.id}`);
+    const viewingDeletedNote = activeNoteId && nbNotes.some((n) => n.id === activeNoteId);
+    if (onDeletedNbPage || viewingDeletedNote) {
       navigate("/", { replace: true });
     }
   }
