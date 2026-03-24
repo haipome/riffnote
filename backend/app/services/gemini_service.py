@@ -3,8 +3,6 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
-import subprocess
-import tempfile
 import time
 from typing import Optional
 
@@ -56,63 +54,37 @@ def _get_client() -> genai.Client:
     return _client
 
 
-def _convert_to_mp3(input_path: str) -> str:
-    """Convert audio file to mp3 using ffmpeg. Returns path to temp mp3 file."""
-    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
-    tmp.close()
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", input_path, "-vn", "-ar", "16000", "-ac", "1", "-b:a", "64k", tmp.name],
-        check=True,
-        capture_output=True,
-    )
-    logger.info("Converted %s -> %s (%d bytes)", input_path, tmp.name, os.path.getsize(tmp.name))
-    return tmp.name
-
-
 def transcribe_audio(audio_file_path: str) -> str:
     """Send audio to Gemini and generate structured text."""
     t0 = time.monotonic()
 
     mime_type, _ = mimetypes.guess_type(audio_file_path)
     if mime_type is None:
-        mime_type = "audio/webm"
+        mime_type = "application/octet-stream"
 
-    # Convert unsupported formats to mp3
-    converted_path = None
     if mime_type not in GEMINI_SUPPORTED_MIMES:
-        converted_path = _convert_to_mp3(audio_file_path)
-        audio_path = converted_path
-        audio_mime = "audio/mpeg"
+        raise ValueError(f"Unsupported audio format: {mime_type}. Supported: {', '.join(sorted(GEMINI_SUPPORTED_MIMES))}")
+
+    client = _get_client()
+    file_size = os.path.getsize(audio_file_path)
+
+    if file_size <= _INLINE_MAX_BYTES:
+        with open(audio_file_path, "rb") as f:
+            audio_bytes = f.read()
+        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+        logger.info("Using inline data: %d bytes, mime=%s", file_size, mime_type)
     else:
-        audio_path = audio_file_path
-        audio_mime = mime_type
-
-    try:
-        client = _get_client()
-        file_size = os.path.getsize(audio_path)
-
-        if file_size <= _INLINE_MAX_BYTES:
-            # Inline data — single API call, much faster
-            with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
-            audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=audio_mime)
-            logger.info("Using inline data: %d bytes, mime=%s", file_size, audio_mime)
-        else:
-            # Large file — must use Files API (upload + reference)
-            audio_part = client.files.upload(
-                file=audio_path,
-                config={"mime_type": audio_mime},
-            )
-            logger.info("Uploaded via Files API: name=%s size=%d", audio_part.name, file_size)
-
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=[audio_part, SYSTEM_PROMPT],
+        audio_part = client.files.upload(
+            file=audio_file_path,
+            config={"mime_type": mime_type},
         )
+        logger.info("Uploaded via Files API: name=%s size=%d", audio_part.name, file_size)
 
-        elapsed = time.monotonic() - t0
-        logger.info("Gemini completed in %.1fs for %s", elapsed, audio_file_path)
-        return response.text
-    finally:
-        if converted_path:
-            os.unlink(converted_path)
+    response = client.models.generate_content(
+        model=MODEL,
+        contents=[audio_part, SYSTEM_PROMPT],
+    )
+
+    elapsed = time.monotonic() - t0
+    logger.info("Gemini completed in %.1fs for %s", elapsed, audio_file_path)
+    return response.text
