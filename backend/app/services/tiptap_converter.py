@@ -1,8 +1,6 @@
 """Convert Markdown to TipTap-compatible JSON document format."""
 from __future__ import annotations
 
-from typing import Any
-
 from markdown_it import MarkdownIt
 
 

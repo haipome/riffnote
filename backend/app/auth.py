@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import httpx
 import jwt
@@ -67,9 +70,10 @@ async def get_current_user(
     try:
         payload = await _verify_token(credentials.credentials)
     except (jwt.PyJWTError, ValueError, KeyError, httpx.HTTPError) as e:
+        logger.warning("Token verification failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {e}",
+            detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

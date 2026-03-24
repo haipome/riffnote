@@ -42,3 +42,5 @@ class NoteStatusResponse(BaseModel):
     id: UUID
     status: str
     error_message: Optional[str] = None
+
+    model_config = {"from_attributes": True}

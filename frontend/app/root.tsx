@@ -4,6 +4,7 @@ import {
   SignInButton,
   SignUpButton,
   useAuth,
+  useUser,
   UserButton,
 } from "@clerk/react";
 import { useEffect, useRef, useState } from "react";
@@ -65,6 +66,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function UserInfo() {
+  const { user } = useUser();
+
+  const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account";
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <UserButton
+        appearance={{
+          elements: {
+            avatarBox: { width: 32, height: 32 },
+            userButtonTrigger: {
+              borderRadius: 0,
+              "&:focus": { boxShadow: "none" },
+              "&::after": {
+                content: `"${displayName.replace(/"/g, '\\"')}"`,
+                fontSize: "0.85rem",
+                color: "#6b7280",
+                marginLeft: "10px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              },
+            },
+          },
+        }}
+      />
+    </div>
   );
 }
 
@@ -582,14 +614,7 @@ function SidebarContent({ collapsed, onToggle, isMobile }: { collapsed: boolean;
         {/* Bottom: auth */}
         <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border)" }} className="dark:border-[var(--color-border-dark)]">
           <Show when="signed-in">
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <UserButton
-                appearance={{
-                  elements: { avatarBox: { width: 32, height: 32 } },
-                }}
-              />
-              <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>Account</span>
-            </div>
+            <UserInfo />
           </Show>
           <Show when="signed-out">
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

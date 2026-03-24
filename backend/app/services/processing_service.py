@@ -39,7 +39,7 @@ def process_note(note_id: UUID) -> None:
     with Session(_sync_engine) as db:
         note = db.get(Note, note_id)
         if note is None:
-            logger.error("Note %d not found for processing", note_id)
+            logger.error("Note %s not found for processing", note_id)
             return
 
         audio_path = note.audio_file_path
@@ -59,7 +59,7 @@ def process_note(note_id: UUID) -> None:
                     last_error = e
                     if attempt < MAX_RETRIES - 1 and _is_retryable(e):
                         delay = RETRY_DELAYS[min(attempt, len(RETRY_DELAYS) - 1)]
-                        logger.warning("Gemini attempt %d failed for note %d, retrying in %ds: %s", attempt + 1, note_id, delay, e)
+                        logger.warning("Gemini attempt %d failed for note %s, retrying in %ds: %s", attempt + 1, note_id, delay, e)
                         time.sleep(delay)
                     else:
                         raise
@@ -93,7 +93,7 @@ def process_note(note_id: UUID) -> None:
             note.status = "completed"
 
         except Exception as e:
-            logger.exception("Failed to process note %d after %d attempts", note_id, MAX_RETRIES)
+            logger.exception("Failed to process note %s after %d attempts", note_id, MAX_RETRIES)
             note.status = "failed"
             note.error_message = str(e)
 
